@@ -85,11 +85,44 @@ func saveProfileStore(s *profileStore) error {
 	if err != nil {
 		return fmt.Errorf("marshaling profiles: %w", err)
 	}
-	tmp := p + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	tmp, err := os.CreateTemp(filepath.Dir(p), ".profiles-*.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temporary profile file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	if err := tmp.Chmod(0o600); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("setting profile file permissions: %w", err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
 		return fmt.Errorf("writing profiles: %w", err)
 	}
-	return os.Rename(tmp, p)
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("closing temporary profile file: %w", err)
+	}
+	return os.Rename(tmpPath, p)
+}
+
+// updateProfileStore keeps each read-modify-write cycle atomic across CLI
+// processes, so concurrent saves and deletes cannot silently overwrite one
+// another.
+func updateProfileStore(update func(*profileStore) error) error {
+	p, err := profileStorePath()
+	if err != nil {
+		return err
+	}
+	return cliutil.WithFileLock(p, func() error {
+		s, err := loadProfileStore()
+		if err != nil {
+			return err
+		}
+		if err := update(s); err != nil {
+			return err
+		}
+		return saveProfileStore(s)
+	})
 }
 
 // GetProfile returns a profile by name, or (nil, nil) if not found.
@@ -235,16 +268,15 @@ captured: they control profile/config resolution and would never apply).`,
 			if len(values) == 0 {
 				return fmt.Errorf("no non-default flags set - pass at least one flag to save into %q", name)
 			}
-			s, err := loadProfileStore()
-			if err != nil {
-				return err
-			}
-			s.Profiles[name] = Profile{Name: name, Description: description, Values: values}
-			if err := saveProfileStore(s); err != nil {
+			profile := Profile{Name: name, Description: description, Values: values}
+			if err := updateProfileStore(func(s *profileStore) error {
+				s.Profiles[name] = profile
+				return nil
+			}); err != nil {
 				return err
 			}
 			if flags.asJSON {
-				return printJSONFiltered(cmd.OutOrStdout(), s.Profiles[name], flags)
+				return printJSONFiltered(cmd.OutOrStdout(), profile, flags)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "saved profile %q with %d values\n", name, len(values))
 			return nil
@@ -366,19 +398,17 @@ func newProfileDeleteCmd(flags *rootFlags) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name := args[0]
-			s, err := loadProfileStore()
-			if err != nil {
-				return err
-			}
-			if _, ok := s.Profiles[name]; !ok {
-				return fmt.Errorf("profile %q not found", name)
-			}
-			if !flags.yes {
-				fmt.Fprintf(cmd.ErrOrStderr(), "refusing to delete %q without --yes\n", name)
-				return fmt.Errorf("confirmation required: pass --yes")
-			}
-			delete(s.Profiles, name)
-			if err := saveProfileStore(s); err != nil {
+			if err := updateProfileStore(func(s *profileStore) error {
+				if _, ok := s.Profiles[name]; !ok {
+					return fmt.Errorf("profile %q not found", name)
+				}
+				if !flags.yes {
+					fmt.Fprintf(cmd.ErrOrStderr(), "refusing to delete %q without --yes\n", name)
+					return fmt.Errorf("confirmation required: pass --yes")
+				}
+				delete(s.Profiles, name)
+				return nil
+			}); err != nil {
 				return err
 			}
 			// JSON envelope: {deleted: name}.
