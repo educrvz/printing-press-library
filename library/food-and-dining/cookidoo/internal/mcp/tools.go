@@ -371,6 +371,12 @@ func makeAPIHandler(method, pathTemplate string, readOnly bool, binaryResponse b
 				return mcpToolError(msg), nil
 			}
 		}
+		if strings.EqualFold(headers[client.HTMLResponseHeader], "true") {
+			data, err = cli.ExtractCookidooRecipeHTML(data, c.RequestBaseURL()+path, c.LastContentType())
+			if err != nil {
+				return mcpToolError("extracting Cookidoo recipe data: " + err.Error()), nil
+			}
+		}
 
 		if binaryResponse {
 			encoded := base64.StdEncoding.EncodeToString(data)
