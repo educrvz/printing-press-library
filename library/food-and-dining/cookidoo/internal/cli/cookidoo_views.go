@@ -113,7 +113,7 @@ func newCookidooViewCmd(flags *rootFlags, name, short string, run cookidooViewRu
 		Use:         name + " [recipe-id-or-url]",
 		Short:       short,
 		Example:     "  cookidoo-pp-cli recipes " + name + " r68517 --json",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Annotations: map[string]string{"mcp:read-only": "true", "pp:data-source": "live"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			values = append(values, args...)
 			if len(values) == 0 {
@@ -138,7 +138,7 @@ func newCookidooPlanCmd(flags *rootFlags) *cobra.Command {
 		Use:         "plan [recipe-id-or-url ...]",
 		Short:       "Aggregate ingredients for recipes into Shopper-ready JSON",
 		Example:     "  cookidoo-pp-cli recipes plan r68517 r68522 --json",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Annotations: map[string]string{"mcp:read-only": "true", "pp:data-source": "live"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			values = append(values, args...)
 			if len(values) == 0 {
@@ -177,7 +177,7 @@ func newCookidooPlanCmd(flags *rootFlags) *cobra.Command {
 			sort.Slice(out.Ingredients, func(i, j int) bool {
 				return strings.ToLower(out.Ingredients[i].Name) < strings.ToLower(out.Ingredients[j].Name)
 			})
-			return flags.printJSON(cmd, out)
+			return printJSONFilteredKeep(cmd.OutOrStdout(), out, flags, "quantity", "unit", "details", "raw_lines")
 		},
 	}
 	cmd.Flags().StringSliceVar(&values, "recipe", nil, "Recipe ID or public Cookidoo URL (repeatable)")
@@ -210,7 +210,7 @@ func newCookidooShopperCmd(flags *rootFlags) *cobra.Command {
 		Use:         "shopper <recipe-id-or-url>",
 		Short:       "Find recipe ingredients in Shopper's product catalog",
 		Example:     "  cookidoo-pp-cli recipes shopper r68517 --shopper-bin shopper-pp-cli --json",
-		Annotations: map[string]string{"mcp:read-only": "true"},
+		Annotations: map[string]string{"mcp:read-only": "true", "mcp:blocked-flags": "shopper-bin", "pp:data-source": "live"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if value == "" && len(args) == 1 {
 				value = args[0]
@@ -304,7 +304,7 @@ func fetchCookidooRecipe(cmd *cobra.Command, flags *rootFlags, c *client.Client,
 	}
 	path := "/recipes/recipe/" + url.PathEscape(locale) + "/" + url.PathEscape(id)
 	data, err := c.GetWithHeaders(cmd.Context(), path, nil, map[string]string{
-		"Accept":                   "text/html,application/xhtml+xml",
+		"Accept":                  "text/html,application/xhtml+xml",
 		client.HTMLResponseHeader: "true",
 	})
 	if err != nil {
@@ -313,7 +313,7 @@ func fetchCookidooRecipe(cmd *cobra.Command, flags *rootFlags, c *client.Client,
 	if c.IsDryRun() {
 		return cookidooRecipe{ID: id, URL: pageURL, Name: "dry-run"}, nil
 	}
-	data, err = extractHTMLResponse(data, htmlExtractionOptions{Mode: "embedded-json", BaseURL: c.RequestBaseURL() + path, ContentType: c.LastContentType(), ScriptSelector: `script[type="application/ld+json"]`})
+	data, err = ExtractCookidooRecipeHTML(data, c.RequestBaseURL()+path, c.LastContentType())
 	if err != nil {
 		return cookidooRecipe{}, err
 	}
