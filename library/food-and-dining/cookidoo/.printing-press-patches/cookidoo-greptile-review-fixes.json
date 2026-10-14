@@ -18,5 +18,5 @@
     "internal/mcp/cobratree/typemap.go",
     "internal/mcp/cobratree/shellout_test.go"
   ],
-  "validated_outcome": "Regression tests and implementation now reside inside the shipped Cookidoo module. Validation is pending the current PR's GitHub Actions after these corrections; no live account credentials or meal-plan mutations are involved."
+  "validated_outcome": "The implementation and regression tests are in the shipped Cookidoo module. Against package code at 9072bca039c782e48bc372e173486a739c9b1257, Go 1.26.9 go test ./..., go test -race ./..., go vet ./..., and go build ./... passed locally with a temporary modfile replacing pinned mcp-go v0.57.0 with cached v0.47.0; the pinned-dependency GitHub govulncheck and five package/manifest/supply-chain verification checks passed on the same code commit. Greptile review is pending on the corrected module paths."
 }
