@@ -1,0 +1,12 @@
+# Local build output
+/bin/
+/build/
+/cookidoo-pp-cli
+/cookidoo-pp-mcp
+/dogfood-results.json
+/*-report.json
+
+# Local runtime state
+.DS_Store
+.env
+.env.*
