@@ -2337,3 +2337,19 @@ func toolResultContentText(result *mcplib.CallToolResult, index int) string {
 	}
 	return text.Text
 }
+
+func TestCommandBlockedMCPFlagsStayUnavailableToCallers(t *testing.T) {
+	cmd := &cobra.Command{Use: "shopper", RunE: func(*cobra.Command, []string) error { return nil }}
+	cmd.Flags().String("shopper-bin", "shopper-pp-cli", "Shopper CLI executable")
+	cmd.Annotations = map[string]string{BlockedFlagsAnnotation: "shopper-bin"}
+	blocked := blockedStructuredArgsForCommand(cmd)
+	if !blocked["shopper-bin"] {
+		t.Fatalf("shopper-bin missing from blocked MCP args: %#v", blocked)
+	}
+	if _, ok := allowedStructuredArgsForCommand(cmd, blocked, nil, false)["shopper-bin"]; ok {
+		t.Fatal("blocked shopper-bin was accepted as a structured MCP argument")
+	}
+	if got := cliArgsFromMCP(map[string]any{"shopper-bin": "/tmp/attacker"}, blocked); len(got) != 0 {
+		t.Fatalf("blocked executable flag reached CLI argv: %v", got)
+	}
+}
