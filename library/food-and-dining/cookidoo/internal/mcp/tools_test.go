@@ -7,6 +7,8 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,6 +17,7 @@ import (
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/internal/cli"
+	"github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/internal/client"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/internal/cliutil"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/internal/cliutil/testenv"
 	"github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/internal/mcp/bound"
@@ -116,6 +119,45 @@ func TestMCPRegisterToolsPreservesTypedSpecialTools(t *testing.T) {
 	}
 	if !strings.Contains(sqlTool.Tool.Description, "Run read-only SQL against local database") {
 		t.Fatalf("sql tool appears to have been overwritten by command mirror: %q", sqlTool.Tool.Description)
+	}
+}
+
+func TestRecipesGetMCPHandlerReturnsExtractedRecipeJSON(t *testing.T) {
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/recipes/recipe/en-US/r123" {
+			t.Errorf("request path = %q", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(`<html><script type="application/ld+json">{"@type":"Recipe","name":"Test soup","recipeIngredient":["2 g salt"]}</script></html>`))
+	}))
+	defer httpServer.Close()
+	t.Setenv("COOKIDOO_BASE_URL", httpServer.URL)
+	t.Setenv("COOKIDOO_HOME", t.TempDir())
+
+	handler := makeAPIHandler(
+		"GET", "/recipes/recipe/{locale}/{recipe_id}", true, false,
+		map[string]string{client.HTMLResponseHeader: "true"}, mcpPageConfig{},
+		[]mcpParamBinding{{PublicName: "locale", WireName: "locale", Location: "path"}, {PublicName: "recipe-id", WireName: "recipe_id", Location: "path"}},
+		[]string{"locale", "recipe_id"},
+	)
+	result, err := handler(context.Background(), mcplib.CallToolRequest{Params: mcplib.CallToolParams{
+		Arguments: map[string]any{"locale": "en-US", "recipe-id": "r123"},
+	}})
+	if err != nil {
+		t.Fatalf("recipes_get returned transport error: %v", err)
+	}
+	if result == nil || result.IsError {
+		t.Fatalf("recipes_get returned error: %s", mcpTextContent(t, result))
+	}
+	var recipe struct {
+		Name        string   `json:"name"`
+		Ingredients []string `json:"recipeIngredient"`
+	}
+	if err := json.Unmarshal([]byte(mcpTextContent(t, result)), &recipe); err != nil {
+		t.Fatalf("recipes_get result is not recipe JSON: %v; response=%s", err, mcpTextContent(t, result))
+	}
+	if recipe.Name != "Test soup" || len(recipe.Ingredients) != 1 || recipe.Ingredients[0] != "2 g salt" {
+		t.Fatalf("recipes_get recipe = %+v", recipe)
 	}
 }
 
