@@ -1,7 +1,7 @@
 {
   "api_name": "cookidoo",
   "base_url": "https://cookidoo.thermomix.com",
-  "description": "Private read-only Cookidoo CLI for Thermomix meal planning",
+  "description": "Read-only Cookidoo CLI for public recipe details and local recipe analysis.",
   "mcp_ready": "full",
   "http_transport": "standard",
   "auth": {
@@ -37,6 +37,13 @@
           "required": true
         }
       ]
+    }
+  ],
+  "novel_features": [
+    {
+      "name": "Multi-Recipe Ingredient Plan",
+      "command": "recipes plan",
+      "description": "Combine ingredients from multiple public Cookidoo recipes into one structured plan for review and shopping handoff."
     }
   ]
 }

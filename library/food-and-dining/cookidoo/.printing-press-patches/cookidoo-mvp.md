@@ -1,6 +1,6 @@
 # Cookidoo v0.1 MVP extension
 
-The generated recipe-get command is preserved. `internal/cli/cookidoo_views.go` is a hand-authored extension registered through the generated novel-command hook and adds read-only `details`, `ingredients`, `nutrition`, and `plan` views. It accepts public recipe IDs/URLs, sends only the required HTML `Accept` header, and emits no authenticated Cookidoo mutations or stored session material.
+The generated recipe-get command is preserved. `internal/cli/cookidoo_views.go` is a hand-authored extension registered through the generated novel-command hook and adds read-only `details`, `ingredients`, `nutrition`, and `plan` views. It accepts public recipe IDs/URLs, sends an HTML `Accept` header and the explicit internal HTML-response marker required by the generated client, and emits no authenticated Cookidoo mutations or stored session material.
 
 Public search was verified in the Codex in-app browser but remains deferred because the browser-rendered result service does not provide a stable credential-free contract for a CLI.
 

@@ -8,8 +8,10 @@ builds:
     binary: cookidoo-pp-cli
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     ldflags:
-      - -s -w -X github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo-pp-cli/internal/cli.version={{ .Version }}
+      - -s -w -X github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/internal/cli.version={{ .Version }}
     targets:
       - darwin_amd64
       - darwin_arm64
@@ -22,6 +24,8 @@ builds:
     binary: cookidoo-pp-mcp
     env:
       - CGO_ENABLED=0
+    flags:
+      - -trimpath
     ldflags:
       - -s -w -X main.version={{ .Version }}
     targets:
@@ -45,7 +49,7 @@ brews:
       owner: educrvz
       name: homebrew-tap
     homepage: "https://github.com/mvanhorn/printing-press-library"
-    description: "Private read-only Cookidoo CLI for Thermomix meal planning"
+    description: "Read-only Cookidoo CLI for public recipe details and local recipe analysis."
     install: |
       bin.install "cookidoo-pp-cli"
       bin.install "cookidoo-pp-mcp"

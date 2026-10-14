@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo-pp-cli/internal/client"
+	"github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/internal/client"
 	"github.com/spf13/cobra"
 )
 
@@ -303,9 +303,12 @@ func fetchCookidooRecipe(cmd *cobra.Command, flags *rootFlags, c *client.Client,
 		return cookidooRecipe{}, err
 	}
 	path := "/recipes/recipe/" + url.PathEscape(locale) + "/" + url.PathEscape(id)
-	data, err := c.GetWithHeaders(cmd.Context(), path, nil, map[string]string{"Accept": "text/html,application/xhtml+xml"})
+	data, err := c.GetWithHeaders(cmd.Context(), path, nil, map[string]string{
+		"Accept":                   "text/html,application/xhtml+xml",
+		client.HTMLResponseHeader: "true",
+	})
 	if err != nil {
-		return cookidooRecipe{}, classifyAPIError(err, flags)
+		return cookidooRecipe{}, classifyAPIError(cmd.ErrOrStderr(), err, flags)
 	}
 	if c.IsDryRun() {
 		return cookidooRecipe{ID: id, URL: pageURL, Name: "dry-run"}, nil

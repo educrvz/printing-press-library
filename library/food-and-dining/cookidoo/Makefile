@@ -3,7 +3,7 @@
 BIN_EXT := $(if $(filter windows,$(shell go env GOOS)),.exe,)
 
 build:
-	go build -o bin/cookidoo-pp-cli$(BIN_EXT) ./cmd/cookidoo-pp-cli
+	go build -trimpath -o bin/cookidoo-pp-cli$(BIN_EXT) ./cmd/cookidoo-pp-cli
 
 test:
 	go test ./...
@@ -18,7 +18,7 @@ clean:
 	rm -rf bin/
 
 build-mcp:
-	go build -o bin/cookidoo-pp-mcp$(BIN_EXT) ./cmd/cookidoo-pp-mcp
+	go build -trimpath -o bin/cookidoo-pp-mcp$(BIN_EXT) ./cmd/cookidoo-pp-mcp
 
 install-mcp:
 	go install ./cmd/cookidoo-pp-mcp

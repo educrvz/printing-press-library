@@ -1,6 +1,10 @@
 name: cookidoo
 description: "Read-only Cookidoo CLI for public recipe details and local recipe analysis"
 version: "0.1.0"
+category: food-and-dining
+creator:
+  handle: educrvz
+  name: educrvz
 base_url: "https://cookidoo.thermomix.com"
 health_check_path: "/foundation/en-US/explore"
 required_headers:
@@ -26,7 +30,7 @@ resources:
         method: GET
         path: "/recipes/recipe/{locale}/{recipe_id}"
         description: "Get a recipe as schema.org JSON-LD"
-        example: "  cookidoo-cli recipes get --locale en-US --recipe-id r68517"
+        example: "recipes --locale en-US --recipe-id r68517"
         happy_args: "--locale=en-US;--recipe-id=r68517"
         params:
           - name: locale

@@ -1,6 +1,6 @@
 ---
 name: pp-cookidoo
-description: "Printing Press CLI for Cookidoo. Read-only access to public recipe data and local recipe analysis."
+description: "Read-only Cookidoo CLI for public recipe details and local recipe analysis. Trigger phrases: `get details for a Cookidoo recipe`, `extract ingredients from public Cookidoo recipes`, `combine ingredients from several recipes`."
 author: "educrvz"
 license: "Apache-2.0"
 argument-hint: "<command> [args] | install cli|mcp"
@@ -10,6 +10,10 @@ metadata:
     requires:
       bins:
         - cookidoo-pp-cli
+    install:
+      - kind: go
+        bins: [cookidoo-pp-cli]
+        module: github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/cmd/cookidoo-pp-cli
 ---
 
 # Cookidoo — Printing Press CLI
@@ -33,16 +37,25 @@ go install github.com/mvanhorn/printing-press-library/library/food-and-dining/co
 
 If `--version` reports "command not found" after install, the runtime cannot see the binary directory on `$PATH`. Do not proceed with skill commands until verification succeeds.
 
+Fetch public recipe details and normalize ingredients and nutrition for agents and scripts. Combine several recipes into one ingredient plan without accessing a Cookidoo account or changing a meal plan.
 
-## When Not to Use This CLI
+## When to Use This CLI
 
-Do not activate this CLI for requests that require creating, updating, deleting, publishing, commenting, upvoting, inviting, ordering, sending messages, booking, purchasing, or changing remote state. This printed CLI exposes read-only commands for inspection, export, sync, and analysis.
+Use this CLI to retrieve public recipe details, ingredients, or nutrition as structured output, or to combine several public recipes into a machine-readable ingredient plan. Use a separate shopping CLI only when you want to search a retailer catalog and review the resulting candidates.
+
+## Anti-triggers
+
+Do not use this CLI for:
+- Authenticated Cookidoo account data or personal meal plans
+- Adding or removing recipes from a Cookidoo week
+- Purchases, cart changes, or recipe search requiring browser-only credentials
 
 ## Unique Capabilities
 
 These capabilities aren't available in any other tool for this API.
 
 ### Read-only meal planning
+
 - **`recipes plan`** — Combine ingredients from multiple public Cookidoo recipes into one structured plan for review and shopping handoff.
 
   _Use this when an agent needs one reviewable ingredient list for several selected recipes before a separate shopping search._
@@ -51,12 +64,38 @@ These capabilities aren't available in any other tool for this API.
   cookidoo-pp-cli recipes plan r68517 r68522 --agent
   ```
 
+## Command Reference
+
+**recipes** — Read public Cookidoo recipe information
+
+- `cookidoo-pp-cli recipes` — Get a recipe as schema.org JSON-LD
+
+
+**recipes**
+
+
+- `cookidoo-pp-cli recipes plan` — Combine ingredients from multiple public Cookidoo recipes into one structured plan for review and shopping handoff.
+
+
+
+
+### Finding the right command
+
+When you know what you want to do but not which command does it, ask the CLI directly:
+
+```bash
+cookidoo-pp-cli which "<capability in your own words>"
+```
+
+`which` resolves a natural-language capability query to the best matching command from this CLI's curated feature index. Exit code `0` means at least one match; exit code `2` means no confident match — fall back to `--help` or use a narrower query. `--json` (and other machine formats) keep that exit-2 contract and write `{"matches":[]}` on stdout so agents can inspect the envelope without treating a miss as success.
+
 ## Recipes
+
 
 ### Inspect a public recipe
 
 ```bash
-cookidoo-pp-cli recipes details r68517 --agent
+cookidoo-pp-cli recipes --locale en-US --recipe-id r68517 --agent
 ```
 
 Return public recipe data in agent-friendly structured output.
@@ -69,23 +108,6 @@ cookidoo-pp-cli recipes plan r68517 r68522 --agent
 
 Create one reviewable ingredient plan from several public recipes.
 
-## Command Reference
-
-**recipes** — Read public Cookidoo recipe information
-
-- `cookidoo-pp-cli recipes` — Get a recipe as schema.org JSON-LD
-
-
-### Finding the right command
-
-When you know what you want to do but not which command does it, ask the CLI directly:
-
-```bash
-cookidoo-pp-cli which "<capability in your own words>"
-```
-
-`which` resolves a natural-language capability query to the best matching command from this CLI's curated feature index. Exit code `0` means at least one match; exit code `2` means no confident match — fall back to `--help` or use a narrower query.
-
 ## Auth Setup
 
 Public recipe lookup does not use Cookidoo credentials. Authenticated account actions and personal meal-plan access are outside this CLI's public scope.
@@ -94,13 +116,20 @@ Run `cookidoo-pp-cli doctor` to verify setup.
 
 ## Agent Mode
 
-Add `--agent` to any command. Expands to: `--json --compact --no-input --no-color --yes`.
+Add `--agent` to any command. Expands to: `--json --compact --no-input --no-color`.
+
+Global format flags share one contract on promoted, novel, sync, and `--deliver` paths:
+
+- `--json` — one JSON document on stdout (sync progress events go to stderr)
+- `--compact` — keep identity/status/timestamp fields; does not change the document vs stream shape
+- `--csv` / `--plain` — tabular rows (collection envelopes unwrap to the row array)
+- `--quiet` — one identity value per row, no envelope
 
 - **Pipeable** — JSON on stdout, errors on stderr
 - **Filterable** — `--select` keeps a subset of fields. Dotted paths descend into nested structures; arrays traverse element-wise. Critical for keeping context small on verbose APIs:
 
   ```bash
-  cookidoo-pp-cli recipes --locale en-US --recipe-id r68517 --agent --select id,name,status
+  cookidoo-pp-cli recipes --locale en-US --recipe-id r68517 --agent
   ```
 - **Previewable** — `--dry-run` shows the request without sending
 - **Offline-friendly** — sync/search commands can use the local SQLite store when available
@@ -127,9 +156,8 @@ Agents should treat the CLI's path resolver as part of the runtime contract:
 - Use `--home <dir>` for one invocation, or set `COOKIDOO_HOME=<dir>` to relocate all four path kinds under one root.
 - Use per-kind env vars only when a specific kind must diverge: `COOKIDOO_CONFIG_DIR`, `COOKIDOO_DATA_DIR`, `COOKIDOO_STATE_DIR`, `COOKIDOO_CACHE_DIR`.
 - Resolution order is per-kind env var, `--home`, `COOKIDOO_HOME`, XDG (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CACHE_HOME`), then platform defaults.
-- `config` contains settings like `config.toml` and profiles. `data` contains `credentials.toml`, `data.db`, cookies, and auth sidecars. `state` contains persisted queries, jobs, and `teach.log`. `cache` contains regenerable HTTP/cache files.
-- Stored secrets live in `credentials.toml` under the data dir. Existing legacy `config.toml` secrets are read for compatibility and leave `config.toml` on the first auth write.
-- Run `cookidoo-pp-cli doctor --fail-on warn` to surface path and credential-location warnings. `agent-context` exposes a schema v4 `paths` block for agents that need the resolved dirs.
+- `config` contains settings like `config.toml` and profiles. `data` contains durable local data such as `data.db`. `state` contains persisted queries, jobs, and `teach.log`. `cache` contains regenerable HTTP/cache files.
+- Run `cookidoo-pp-cli doctor --fail-on warn` to surface path warnings. `agent-context` exposes a schema v4 `paths` block for agents that need the resolved dirs.
 - For MCP, pass relocation through the MCP host config. The MCP binary does not inherit CLI flags:
 
   ```json
@@ -145,7 +173,7 @@ Agents should treat the CLI's path resolver as part of the runtime contract:
   }
   ```
 
-Fleet precedence: an inherited per-kind env var overrides an explicit `--home` for that kind. Use `COOKIDOO_HOME` or per-kind vars as durable fleet levers, and use `--home` only for a single invocation. Relocation is not reversible by unsetting env vars; move files manually before clearing `COOKIDOO_HOME`, or `doctor` will not find credentials left under the former root.
+Fleet precedence: an inherited per-kind env var overrides an explicit `--home` for that kind. Use `COOKIDOO_HOME` or per-kind vars as durable fleet levers, and use `--home` only for a single invocation. Relocation is not reversible by unsetting env vars; move files manually before clearing `COOKIDOO_HOME`, or `doctor` will not find files left under the former root.
 
 ## Automatic learning
 
@@ -153,11 +181,19 @@ This CLI ships a self-capturing learning loop. The CLI does its own bookkeeping:
 
 ### Step 1: `recall` before any discovery
 
-Before list/search/drill commands on a new user question, run:
+Before list/search/drill commands on a new user question, pass the question as an argv or MCP tool argument to `recall --agent`. Do not interpolate user-controlled text into a shell command line.
+
+Quoted `recall "<question>"` breaks on an apostrophe, which is ordinary English. A quoted heredoc breaks when a body line equals the delimiter, and that delimiter is published in these docs. Write the question with a non-shell file-writing tool, then read it back as data:
 
 ```bash
-cookidoo-pp-cli recall "<user's question>" --agent
+# Write the question verbatim with your file-writing tool (no shell involved).
+# Command substitution on a file only ever yields data — the shell never
+# parses the file's bytes as syntax.
+QUERY=$(cat /path/to/question.txt)
+cookidoo-pp-cli recall "$QUERY" --agent
 ```
+
+Prefer MCP: pass the question as the tool's query argument. `"$QUERY"` after a file read is argv-safe; putting the question itself in the command text is not.
 
 The response envelope:
 
@@ -260,10 +296,11 @@ Graceful degradation: if `learnings confirm` is an unknown command, you are driv
 
 ### Step 4: `teach &` after finalizing your response - always
 
-Teaching is unconditional. After resolving a query the store could not answer, background-teach the final resource mapping - no call-count threshold, no judging whether it was "worth" learning. The teach is the anchor of the loop: it triggers playbook synthesis for a family without a playbook, and same-referent phrasings fold into one family so near-duplicate teaches do not fragment the store. Fire it after assembling your user-facing response but BEFORE emitting it, with a shell `&` so the call returns immediately:
+Teaching is unconditional. After resolving a query the store could not answer, background-teach the final resource mapping - no call-count threshold, no judging whether it was "worth" learning. The teach is the anchor of the loop: it triggers playbook synthesis for a family without a playbook, and same-referent phrasings fold into one family so near-duplicate teaches do not fragment the store. Fire it after assembling your user-facing response but BEFORE emitting it, with a shell `&` so the call returns immediately. Pass the query the same way as recall — argv/MCP, or file-then-`$QUERY`. Do not splice the question into the command text:
 
 ```bash
-cookidoo-pp-cli teach --query "<user's question>" --resource-type <type> --resource <id1> --resource <id2>
+QUERY=$(cat /path/to/question.txt)
+cookidoo-pp-cli teach --query "$QUERY" --resource-type <type> --resource <id1> --resource <id2>
 # (append shell `&` to background it)
 ```
 
@@ -277,16 +314,18 @@ You do not need to decide whether a session "deserves" a playbook: a teach on a 
 
 ```bash
 # Common case: record both the resource learning AND the playbook in one call.
+QUERY=$(cat /path/to/question.txt)
 cookidoo-pp-cli teach \
-  --query "<user's question>" \
+  --query "$QUERY" \
   --resource <id> \
   --playbook-file ~/playbooks/<shape>.json \
   --playbook-notes-file ~/playbooks/<shape>-notes.md
 # (append shell `&` to background it)
 
 # Alternate: playbook-only (no resource to record alongside).
+QUERY=$(cat /path/to/question.txt)
 cookidoo-pp-cli teach-playbook \
-  --query "<user's question>" \
+  --query "$QUERY" \
   --playbook-file ~/playbooks/<shape>.json \
   --notes-file ~/playbooks/<shape>-notes.md
 ```
@@ -297,12 +336,14 @@ When you DO find a playbook on a future recall, treat it as ground truth: replay
 
 ### Step 6: `playbook amend &` when your debug response identifies a correction
 
-If your debug-protocol response identifies a concrete correction the notes or playbook should know — a workaround, an undocumented endpoint shape, a stale field name, observed schema drift, an empty-payload fallback — fire `playbook amend` BEFORE emitting your user-facing response. Same fire-and-forget posture as `teach`.
+If your debug-protocol response identifies a concrete correction the notes or playbook should know — a workaround, an undocumented endpoint shape, a stale field name, observed schema drift, an empty-payload fallback — fire `playbook amend` BEFORE emitting your user-facing response. Same fire-and-forget posture as `teach`. Pass the query and note as argv/MCP arguments, or write each with a non-shell file tool and read them back (`QUERY=$(cat ...)`, `NOTE=$(cat ...)`). Do not interpolate either string into the command text:
 
 ```bash
+QUERY=$(cat /path/to/question.txt)
+NOTE=$(cat /path/to/note.txt)
 cookidoo-pp-cli playbook amend \
-  --query "<exact recall query string>" \
-  --add-note "<your concrete correction>"
+  --query "$QUERY" \
+  --add-note "$NOTE"
 # (append shell `&` to background it)
 ```
 
@@ -359,8 +400,8 @@ Every command accepts `--deliver <sink>`. The output goes to the named sink in a
 | Sink | Effect |
 |------|--------|
 | `stdout` | Default; write to stdout only |
-| `file:<path>` | Atomically write output to `<path>` (tmp + rename) |
-| `webhook:<url>` | POST the output body to the URL (`application/json` or `application/x-ndjson` when `--compact`) |
+| `file:<path>` | Atomically write output to `<path>` (tmp + rename). Binary-response commands write decoded payload bytes (not the base64 JSON envelope) and print a small JSON receipt on stdout; `--json`/`--csv` do not refuse when this sink is set. |
+| `webhook:<url>` | POST the output body to the URL (`application/json`) |
 
 Unknown schemes are refused with a structured error naming the supported set. Webhook failures return non-zero and log the URL + HTTP status on stderr.
 
@@ -386,7 +427,7 @@ Explicit flags always win over profile values; profile values win over defaults.
 | 2 | Usage error (wrong arguments) |
 | 3 | Resource not found |
 | 5 | API error (upstream issue) |
-| 7 | Rate limited (wait and retry) |
+| 7 | Rate limited or blocked by a firewall or bot challenge (back off; do not retry immediately) |
 | 10 | Config error |
 
 ## Argument Parsing
@@ -399,13 +440,15 @@ Parse `$ARGUMENTS`:
 
 ## MCP Server Installation
 
-Install the MCP binary from this CLI's published public-library entry or pre-built release, then register it:
-
-```bash
-claude mcp add cookidoo-pp-mcp -- cookidoo-pp-mcp
-```
-
-Verify: `claude mcp list`
+1. Install the MCP server:
+   ```bash
+   go install github.com/mvanhorn/printing-press-library/library/food-and-dining/cookidoo/cmd/cookidoo-pp-mcp@latest
+   ```
+2. Register with Claude Code:
+   ```bash
+   claude mcp add cookidoo-pp-mcp -- cookidoo-pp-mcp
+   ```
+3. Verify: `claude mcp list`
 
 ## Direct Use
 
