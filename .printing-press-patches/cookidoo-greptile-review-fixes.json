@@ -1,0 +1,16 @@
+{
+  "schema_version": 2,
+  "id": "cookidoo-greptile-review-fixes",
+  "applied_at": "2026-10-14",
+  "base_run_id": "20261014-192048",
+  "base_printing_press_version": "4.33.5",
+  "summary": "Address Greptile security and correctness findings on the Cookidoo package.",
+  "reason": "Review identified unsafe MCP executable selection, unparsed HTML recipe output, data-source provenance mismatches, concurrent profile write races, and compacted ingredient amounts.",
+  "files": [
+    "internal/cli/profile.go",
+    "internal/mcp/tools.go",
+    "internal/mcp/cobratree/classify.go",
+    "internal/mcp/cobratree/typemap.go"
+  ],
+  "validated_outcome": "Regression tests cover blocked MCP executable selection, JSON-LD extraction in the recipes_get handler, live-only source validation, compact ingredient quantity and unit retention, and concurrent profile updates. The complete test and race suites, vet, and build pass with Go 1.26.9 and a temporary replacement to the MCP-Go version already cached on this host; the PR CI will verify the package's pinned MCP-Go dependency."
+}
