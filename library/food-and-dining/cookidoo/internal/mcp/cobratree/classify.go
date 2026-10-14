@@ -46,6 +46,11 @@ const (
 	// is a different flag. Separate names with commas, semicolons, or
 	// whitespace. A leading "--" is ignored.
 	FlagWriteSinksAnnotation = "mcp:write-flags"
+	// BlockedFlagsAnnotation lists flags that are unsafe to let an MCP caller
+	// control even when the CLI command itself is read-only. The flags remain
+	// available to interactive CLI users but are omitted from MCP schemas and
+	// rejected if supplied directly.
+	BlockedFlagsAnnotation = "mcp:blocked-flags"
 	// ReadOnlyUnlessFlagsAnnotation lists Cobra flag names that turn an
 	// otherwise readable command into a write. With the MCP read-only switch
 	// on, the walker still registers the command, drops those flags, and
@@ -178,6 +183,24 @@ func flagWriteSinkNames(cmd *cobra.Command) map[string]bool {
 	}
 	if len(out) == 0 {
 		return nil
+	}
+	return out
+}
+
+func blockedMCPFlagNames(cmd *cobra.Command) map[string]bool {
+	if cmd == nil {
+		return nil
+	}
+	out := annotationNamedFlags(cmd.Annotations, BlockedFlagsAnnotation)
+	for parent := cmd.Parent(); parent != nil; parent = parent.Parent() {
+		for name := range annotationNamedFlags(parent.Annotations, BlockedFlagsAnnotation) {
+			if inheritedWriteSink(cmd, name) && persistentFlagSupplier(cmd, name) == parent {
+				if out == nil {
+					out = map[string]bool{}
+				}
+				out[name] = true
+			}
+		}
 	}
 	return out
 }
